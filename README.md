@@ -1,6 +1,98 @@
 # Attendly — Dashboard Absensi
+Sistem absensi berbasis Internet of Things (IoT) menggunakan ESP32 dan RFID RC522. Sistem membaca kartu RFID, memvalidasi UID kartu, menampilkan informasi mahasiswa melalui OLED, serta mengirimkan data kehadiran ke Google Sheets melalui Google Apps Script. Dilengkapi dashboard berbasis website. sistem ini masih jalan di local
 
-Dashboard React + Vite untuk memantau spreadsheet absensi ESP32 dengan kolom yang ada: `No, UID, Nama, NIM, Kelas, Tanggal, Waktu, Status`.
+## Komponen yang Digunakan
+
+| No. | Komponen | Jumlah | Fungsi |
+|---:|---|---:|---|
+| 1 | ESP32 Dev Module | 1 | Mikrokontroler utama |
+| 2 | RFID RC522 | 1 | Membaca UID kartu RFID |
+| 3 | RFID Card / Tag | Sesuai kebutuhan | Identitas pengguna |
+| 4 | OLED Display 0.96" SSD1306 | 1 | Menampilkan informasi absensi |
+| 5 | Breadboard | 1 | Media perakitan rangkaian |
+| 6 | Buzzer | 1 | Indikator suara |
+| 7 | LED Hijau | 1 | Indikator kartu terdaftar |
+| 8 | LED Merah | 1 | Indikator kartu tidak terdaftar |
+| 9 | Resistor 220Ω | 2 | Membatasi arus LED |
+| 10 | Kabel Jumper | Secukupnya | Menghubungkan komponen |
+
+
+## Wiring dan Koneksi Komponen
+
+### A. ESP32 dengan RFID RC522
+
+Modul RC522 menggunakan komunikasi SPI.
+
+| No. | Pin RC522 | Pin ESP32 |
+|---:|---|---|
+| 1 | SDA / SS | GPIO 5 |
+| 2 | SCK | GPIO 18 |
+| 3 | MOSI | GPIO 23 |
+| 4 | MISO | GPIO 19 |
+| 5 | RST | GPIO 4 |
+| 6 | 3.3V | 3V3 |
+| 7 | GND | GND |
+
+**Catatan:** Pin SDA pada RC522 merupakan pin SS untuk komunikasi SPI, bukan SDA I2C. RC522 wajib menggunakan tegangan 3.3V, bukan 5V.
+
+### B. ESP32 dengan OLED SSD1306 0.96"
+
+OLED menggunakan komunikasi I2C.
+
+| No. | Pin OLED | Pin ESP32 |
+|---:|---|---|
+| 1 | VCC | 3V3 |
+| 2 | GND | GND |
+| 3 | SDA | GPIO 21 |
+| 4 | SCL | GPIO 22 |
+
+Konfigurasi OLED:
+- Resolusi: 128 × 64 pixel
+- Alamat I2C: 0x3C
+- Komunikasi: I2C
+
+### C. ESP32 dengan LED
+
+| No. | Komponen | Koneksi ESP32 |
+|---:|---|---|
+| 1 | LED Hijau (Anoda) | GPIO 27 melalui resistor 220Ω |
+| 2 | LED Hijau (Katoda) | GND |
+| 3 | LED Merah (Anoda) | GPIO 25 melalui resistor 220Ω |
+| 4 | LED Merah (Katoda) | GND |
+
+Keterangan:
+- LED hijau menyala ketika kartu RFID terdaftar.
+- LED merah menyala ketika kartu RFID tidak terdaftar.
+- Resistor 220Ω digunakan untuk membatasi arus LED.
+
+### D. ESP32 dengan Buzzer
+
+| No. | Pin Buzzer | Pin ESP32 |
+|---:|---|---|
+| 1 | Positif (+) | GPIO 26 |
+| 2 | Negatif (-) | GND |
+
+Pastikan spesifikasi buzzer sesuai dengan kemampuan output GPIO ESP32. Gunakan transistor driver jika buzzer membutuhkan arus lebih besar.
+
+## Library yang Dibutuhkan
+
+Instal library berikut melalui Arduino IDE Library Manager:
+
+| No. | Nama Library | Kegunaan |
+|---:|---|---|
+| 1 | MFRC522 | Komunikasi dengan RFID RC522 |
+| 2 | Adafruit GFX Library | Library grafis OLED |
+| 3 | Adafruit SSD1306 | Mengontrol OLED SSD1306 |
+
+Library bawaan ESP32:
+- SPI
+- Wire
+- WiFi
+- WiFiClientSecure
+- HTTPClient
+
+Pastikan ESP32 Board Package sudah terpasang di Arduino IDE.
+
 
 ## Menyiapkan Apps Script
 
