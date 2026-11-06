@@ -1,0 +1,598 @@
+
+#include <SPI.h>
+#include <MFRC522.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+
+// =====================================
+// KONFIGURASI WIFI
+// =====================================
+
+const char* WIFI_SSID = "[isi dengan ssid wifi]";
+const char* WIFI_PASSWORD = "[isi dengan password wifi]";
+
+// =====================================
+// KONFIGURASI GOOGLE SHEETS
+// =====================================
+
+// Gunakan URL Web App hasil deployment.
+// Pastikan URL berakhiran /exec.
+
+const char* SCRIPT_URL ="[isi dengan script url berakhiran /exec]";
+
+
+
+// API Key harus sama dengan Apps Script.
+const char* API_KEY = "[isi dengan API buatan mandiri]";
+
+// =====================================
+// KONFIGURASI PIN ESP32
+// =====================================
+
+// RFID RC522
+#define SS_PIN    5
+#define RST_PIN   4
+#define SCK_PIN   18
+#define MISO_PIN  19
+#define MOSI_PIN  23
+
+// OLED
+#define SCREEN_WIDTH  128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET    -1
+#define OLED_ADDRESS  0x3C
+
+// Buzzer dan LED
+#define BUZZER_PIN 26
+#define LED_PIN    27
+#define LED_RED    25
+
+// =====================================
+// INISIALISASI KOMPONEN
+// =====================================
+
+MFRC522 rfid(SS_PIN, RST_PIN);
+
+Adafruit_SSD1306 display(
+  SCREEN_WIDTH,
+  SCREEN_HEIGHT,
+  &Wire,
+  OLED_RESET
+);
+
+// =====================================
+// DATA MAHASISWA REAL
+// =====================================
+
+struct Mahasiswa {
+  String uid;
+  String nama;
+  String nim;
+  String kelas;
+};
+
+Mahasiswa dataMahasiswa[] = {
+  {"7E 51 D8 05", "Muhammad Zaki Ulwi", "5232451005", "PTIK D 2023"},
+  {"17 EE D6 05", "Joko Hendratmo", "5232451004", "PTIK D 2023"},
+  {"25 78 2F 8E", "Andini Septiani", "5232451001", "PTIK D 2023"},
+  {"5A 7D D4 05", "Prabowo Subianto", "5232451002", "PTIK D 2023"}
+};
+
+const int jumlahMahasiswa =
+  sizeof(dataMahasiswa) / sizeof(dataMahasiswa[0]);
+
+// =====================================
+// FUNGSI TAMPILKAN PESAN OLED
+// =====================================
+
+void tampilkanPesan(
+  String baris1,
+  String baris2,
+  String baris3,
+  String baris4
+) {
+  display.clearDisplay();
+
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 3);
+  display.println("SMART ATTENDANCE");
+
+  display.drawLine(0, 15, 127, 15, SSD1306_WHITE);
+
+  display.setCursor(0, 20);
+  display.println(baris1);
+
+  display.setCursor(0, 32);
+  display.println(baris2);
+
+  display.setCursor(0, 44);
+  display.println(baris3);
+
+  display.setCursor(0, 56);
+  display.println(baris4);
+
+  display.display();
+}
+
+// =====================================
+// FUNGSI KONEKSI WIFI
+// =====================================
+
+bool hubungkanWiFi() {
+
+  if (WiFi.status() == WL_CONNECTED) {
+    return true;
+  }
+
+  Serial.println("Menghubungkan ke WiFi...");
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  unsigned long mulai = millis();
+
+  while (
+    WiFi.status() != WL_CONNECTED &&
+    millis() - mulai < 15000
+  ) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println();
+
+  if (WiFi.status() == WL_CONNECTED) {
+
+    Serial.println("WiFi berhasil terhubung!");
+
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+
+    return true;
+  }
+
+  Serial.println("Gagal terhubung ke WiFi!");
+
+  return false;
+}
+
+// =====================================
+// FUNGSI MEMBACA UID RFID
+// =====================================
+
+String bacaUID() {
+
+  String uid = "";
+
+  for (byte i = 0; i < rfid.uid.size; i++) {
+
+    if (rfid.uid.uidByte[i] < 0x10) {
+      uid += "0";
+    }
+
+    uid += String(rfid.uid.uidByte[i], HEX);
+
+    if (i < rfid.uid.size - 1) {
+      uid += " ";
+    }
+  }
+
+  uid.toUpperCase();
+
+  return uid;
+}
+
+// =====================================
+// FUNGSI MENCARI MAHASISWA
+// =====================================
+
+int cariMahasiswa(String uid) {
+
+  for (int i = 0; i < jumlahMahasiswa; i++) {
+
+    if (dataMahasiswa[i].uid == uid) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+// =====================================
+// FUNGSI BUZZER
+// =====================================
+
+void bunyikanBuzzer() {
+
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(200);
+  digitalWrite(BUZZER_PIN, LOW);
+}
+
+// =====================================
+// FUNGSI KIRIM ABSENSI KE GOOGLE SHEETS
+// =====================================
+
+
+bool kirimAbsensi(int index) {
+
+  // Periksa koneksi WiFi
+  if (!hubungkanWiFi()) {
+    Serial.println("Gagal: WiFi tidak terhubung!");
+    return false;
+  }
+
+  Serial.println();
+  Serial.println("Menghubungkan ke Google Apps Script...");
+
+  // =================================
+  // MEMBUAT DATA JSON
+  // =================================
+
+  String json = "{";
+
+  json += "\"apiKey\":\"" + String(API_KEY) + "\",";
+  json += "\"uid\":\"" + dataMahasiswa[index].uid + "\",";
+  json += "\"nama\":\"" + dataMahasiswa[index].nama + "\",";
+  json += "\"nim\":\"" + dataMahasiswa[index].nim + "\",";
+  json += "\"kelas\":\"" + dataMahasiswa[index].kelas + "\"";
+
+  json += "}";
+
+  Serial.println("Data yang dikirim:");
+  Serial.println(json);
+
+  // =================================
+  // TAHAP 1: HTTP POST
+  // =================================
+
+  WiFiClientSecure client;
+  client.setInsecure();
+  client.setTimeout(20000);
+
+  HTTPClient http;
+  http.setTimeout(20000);
+
+  // Nonaktifkan redirect otomatis
+  http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+
+  // Ambil header Location
+  const char* headerKeys[] = {"Location"};
+  http.collectHeaders(headerKeys, 1);
+
+  if (!http.begin(client, SCRIPT_URL)) {
+    Serial.println("Gagal memulai koneksi HTTP!");
+    return false;
+  }
+
+  http.addHeader("Content-Type", "application/json");
+
+  Serial.println();
+  Serial.println("Mengirim HTTP POST...");
+
+  int postCode = http.POST(json);
+
+  String postResponse = "";
+  String redirectURL = http.header("Location");
+
+  if (postCode > 0) {
+    postResponse = http.getString();
+  }
+
+  Serial.println();
+  Serial.println("========== HASIL POST ==========");
+
+  Serial.print("HTTP Status POST: ");
+  Serial.println(postCode);
+
+  Serial.print("Location: ");
+  Serial.println(redirectURL);
+
+  Serial.print("Response POST: ");
+  Serial.println(postResponse);
+
+  http.end();
+
+  // =================================
+  // JIKA LANGSUNG MENDAPATKAN JSON
+  // =================================
+
+  if (
+    postCode == HTTP_CODE_OK &&
+    postResponse.indexOf("\"success\":true") >= 0
+  ) {
+    Serial.println("ABSENSI BERHASIL DISIMPAN!");
+    return true;
+  }
+
+  // =================================
+  // PERIKSA REDIRECT GOOGLE
+  // =================================
+
+  if (postCode < 300 || postCode >= 400) {
+    Serial.println("POST tidak menghasilkan redirect yang diharapkan.");
+    Serial.println("Jangan kirim ulang POST otomatis agar tidak duplikat.");
+    return false;
+  }
+
+  if (redirectURL.length() == 0) {
+    Serial.println("URL redirect tidak ditemukan!");
+    return false;
+  }
+
+  // =================================
+  // TAHAP 2: HTTP GET REDIRECT
+  // =================================
+
+  Serial.println();
+  Serial.println("Mengakses URL redirect Google...");
+
+  WiFiClientSecure redirectClient;
+  redirectClient.setInsecure();
+  redirectClient.setTimeout(10000);
+
+  HTTPClient redirectHttp;
+  redirectHttp.setTimeout(10000);
+
+  redirectHttp.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+
+  if (!redirectHttp.begin(redirectClient, redirectURL)) {
+    Serial.println("Gagal membuka URL redirect!");
+    return false;
+  }
+
+  Serial.println("Mengirim HTTP GET...");
+
+  int redirectCode = redirectHttp.GET();
+
+  String response = "";
+
+  if (redirectCode > 0) {
+    response = redirectHttp.getString();
+  }
+
+  Serial.println();
+  Serial.println("========== HASIL REDIRECT ==========");
+
+  Serial.print("HTTP Status Redirect: ");
+  Serial.println(redirectCode);
+
+  Serial.println("Response Google:");
+  Serial.println(response);
+
+  Serial.println("====================================");
+
+  redirectHttp.end();
+
+  // =================================
+  // MEMERIKSA HASIL AKHIR
+  // =================================
+
+  if (
+    redirectCode == HTTP_CODE_OK &&
+    response.indexOf("\"success\":true") >= 0
+  ) {
+    Serial.println("ABSENSI BERHASIL DISIMPAN!");
+    return true;
+  }
+
+  Serial.println("Data mungkin sudah tersimpan, tetapi respons belum terkonfirmasi.");
+
+  return false;
+}
+
+// =====================================
+// FUNGSI SETUP
+// =====================================
+
+void setup() {
+
+  Serial.begin(115200);
+
+  // Konfigurasi pin
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(LED_RED, OUTPUT);
+
+  digitalWrite(BUZZER_PIN, LOW);
+  digitalWrite(LED_PIN, LOW);
+  digitalWrite(LED_RED, LOW);
+
+  // Inisialisasi OLED
+  Wire.begin(21, 22);
+
+  if (!display.begin(
+    SSD1306_SWITCHCAPVCC,
+    OLED_ADDRESS
+  )) {
+
+    Serial.println("OLED tidak ditemukan!");
+
+    while (true) {
+      delay(100);
+    }
+  }
+
+  // Inisialisasi RFID
+  SPI.begin(
+    SCK_PIN,
+    MISO_PIN,
+    MOSI_PIN,
+    SS_PIN
+  );
+
+  rfid.PCD_Init();
+
+  delay(500);
+
+  // Tampilkan proses WiFi
+  tampilkanPesan(
+    "MENGHUBUNGKAN WIFI",
+    "Mohon tunggu...",
+    "",
+    ""
+  );
+
+  // Hubungkan WiFi
+  hubungkanWiFi();
+
+  // Tampilan awal
+  tampilkanPesan(
+    "SISTEM AKTIF",
+    "Silakan scan kartu",
+    "",
+    ""
+  );
+
+  Serial.println("==============================");
+  Serial.println("SMART ATTENDANCE SYSTEM");
+  Serial.println("GOOGLE SHEETS INTEGRATION");
+  Serial.println("==============================");
+
+}
+
+// =====================================
+// FUNGSI LOOP
+// =====================================
+
+void loop() {
+
+  // Periksa kartu baru
+  if (!rfid.PICC_IsNewCardPresent()) {
+    return;
+  }
+
+  // Baca kartu RFID
+  if (!rfid.PICC_ReadCardSerial()) {
+    return;
+  }
+
+  // Ambil UID
+  String uid = bacaUID();
+
+  Serial.println();
+  Serial.println("==============================");
+
+  Serial.println("KARTU TERDETEKSI!");
+
+  Serial.print("UID: ");
+  Serial.println(uid);
+
+  // Cari data mahasiswa
+  int index = cariMahasiswa(uid);
+
+  // =================================
+  // JIKA KARTU TERDAFTAR
+  // =================================
+
+  if (index != -1) {
+
+    Serial.println("Status: TERDAFTAR");
+
+    Serial.print("Nama: ");
+    Serial.println(dataMahasiswa[index].nama);
+
+    Serial.print("NIM: ");
+    Serial.println(dataMahasiswa[index].nim);
+
+    Serial.print("Kelas: ");
+    Serial.println(dataMahasiswa[index].kelas);
+
+    // LED hijau menyala
+    digitalWrite(LED_PIN, HIGH);
+
+    // LED merah mati
+    digitalWrite(LED_RED, LOW);
+
+    // Buzzer berbunyi
+    bunyikanBuzzer();
+
+    // Tampilkan data mahasiswa
+    tampilkanPesan(
+      "SELAMAT DATANG!",
+      dataMahasiswa[index].nama,
+      dataMahasiswa[index].nim,
+      dataMahasiswa[index].kelas
+    );
+
+    // Kirim data ke Google Sheets
+    bool berhasil = kirimAbsensi(index);
+
+    if (berhasil) {
+
+      Serial.println("ABSENSI BERHASIL!");
+
+      tampilkanPesan(
+        "ABSENSI BERHASIL",
+        dataMahasiswa[index].nama,
+        "Status: HADIR",
+        "Tersimpan di Sheets"
+      );
+
+    } else {
+
+      Serial.println("ABSENSI BELUM TERKONFIRMASI!");
+
+      tampilkanPesan(
+        "PENGIRIMAN GAGAL",
+        dataMahasiswa[index].nama,
+        "Periksa WiFi",
+        "Dan Google Sheets"
+      );
+    }
+
+  }
+
+  // =================================
+  // JIKA KARTU TIDAK TERDAFTAR
+  // =================================
+
+  else {
+
+    Serial.println("Status: TIDAK TERDAFTAR");
+
+    // LED hijau mati
+    digitalWrite(LED_PIN, LOW);
+
+    // LED merah menyala
+    digitalWrite(LED_RED, HIGH);
+
+    // Buzzer berbunyi
+    bunyikanBuzzer();
+
+    // Tampilkan pesan
+    tampilkanPesan(
+      "KARTU TIDAK DIKENAL",
+      "UID:",
+      uid,
+      ""
+    );
+
+  }
+
+  // Hentikan komunikasi RFID
+  rfid.PICC_HaltA();
+  rfid.PCD_StopCrypto1();
+
+  // Tunggu 2 detik
+  delay(2000);
+
+  // Matikan semua LED
+  digitalWrite(LED_PIN, LOW);
+  digitalWrite(LED_RED, LOW);
+
+  // Kembali ke standby
+  tampilkanPesan(
+    "SISTEM AKTIF",
+    "Silakan scan kartu",
+    "",
+    ""
+  );
+
+}
