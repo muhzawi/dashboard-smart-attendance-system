@@ -97,7 +97,7 @@ Pastikan ESP32 Board Package sudah terpasang di Arduino IDE.
 ## Menyiapkan Apps Script
 
 1. Buka proyek Apps Script yang saat ini menerima data ESP32.
-2. Tambahkan isi `apps-script/doGet.gs` ke proyek yang sama. Biarkan fungsi `doPost(e)` yang sudah dipakai ESP32 tetap ada.
+2. Tambahkan isi `apps-script/doGet.gs` dan `apps-script/doPost.gs`
 3. Ubah `ATTENDANCE_SHEET_NAME` agar sama persis dengan nama tab spreadsheet. Pastikan delapan header berada di baris pertama dalam urutan di atas.
 4. Simpan, lalu pilih **Deploy → Manage deployments → Edit → New version → Deploy**. Pertahankan URL deployment Web App yang sudah dipakai ESP32.
 5. Buka URL `/exec` di browser untuk melihat respons JSON. Dashboard meminta `?callback=...` (JSONP) agar dapat mengikuti redirect ContentService Google Apps Script tanpa kendala CORS browser.
@@ -120,3 +120,7 @@ Untuk menghasilkan berkas hosting, jalankan `npm run build`; hasilnya ada di `di
 - Refresh manual dan otomatis tiap 30 detik.
 
 Jumlah siswa terdaftar atau belum hadir tidak bisa dihitung dari sheet absensi saja; metrik tersebut memerlukan daftar roster siswa.
+
+## Panduan lengkap
+
+Lihat [Panduan Menjalankan Smart Attendance System](PANDUAN_MENJALANKAN.md) untuk langkah terperinci menyiapkan Google Sheets dan Apps Script, mengunggah firmware ke ESP32, menjalankan dashboard, serta memeriksa kendala umum.
