@@ -261,7 +261,11 @@ export default function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="#dashboard" aria-label="Dashboard Monitoring Absensi">
+        <a
+          className="brand"
+          href="#dashboard"
+          aria-label="Dashboard Monitoring Absensi"
+        >
           <span className="brand-mark">
             <Icon name="scan" size={19} />
           </span>
@@ -464,7 +468,11 @@ export default function App() {
                 </select>
                 <Icon name="chevron" size={15} />
               </label>
-              {(search || date || kelas || status || sortOrder !== "oldest") && (
+              {(search ||
+                date ||
+                kelas ||
+                status ||
+                sortOrder !== "oldest") && (
                 <button className="clear-button" onClick={clearFilters}>
                   Reset
                 </button>
@@ -559,8 +567,8 @@ export default function App() {
             </footer>
           </section>
           <footer className="page-footer">
-            © {new Date().getFullYear()} Dashboard Monitoring Absensi <span>•</span> Sistem
-            Monitoring Absensi Siswa
+            © {new Date().getFullYear()} Dashboard Monitoring Absensi{" "}
+            <span>•</span> Sistem Monitoring Absensi Siswa
           </footer>
         </div>
       </main>
