@@ -38,6 +38,18 @@ function dateKey(value) {
   return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
 }
 
+function attendanceDateTime(row) {
+  const date = dateKey(row.Tanggal);
+  if (!date) return "";
+  const time = String(row.Waktu || "")
+    .trim()
+    .match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  const normalizedTime = time
+    ? `${time[1].padStart(2, "0")}:${time[2]}:${time[3] || "00"}`
+    : "00:00:00";
+  return `${date} ${normalizedTime}`;
+}
+
 function Icon({ name, size = 20 }) {
   const shapes = {
     grid: (
@@ -135,6 +147,7 @@ export default function App() {
   const [date, setDate] = useState("");
   const [kelas, setKelas] = useState("");
   const [status, setStatus] = useState("");
+  const [sortOrder, setSortOrder] = useState("oldest");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -195,7 +208,7 @@ export default function App() {
 
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("id-ID");
-    return records.filter((row) => {
+    const matchingRecords = records.filter((row) => {
       const searchable = [row.Nama, row.NIM, row.UID, row.Kelas]
         .join(" ")
         .toLocaleLowerCase("id-ID");
@@ -206,7 +219,20 @@ export default function App() {
         (!status || row.Status === status)
       );
     });
-  }, [records, search, date, kelas, status]);
+    const direction = sortOrder === "oldest" ? 1 : -1;
+    return matchingRecords
+      .map((row, index) => ({ row, index }))
+      .sort((a, b) => {
+        const aDateTime = attendanceDateTime(a.row);
+        const bDateTime = attendanceDateTime(b.row);
+        if (!aDateTime && bDateTime) return 1;
+        if (aDateTime && !bDateTime) return -1;
+        return (
+          aDateTime.localeCompare(bDateTime) * direction || a.index - b.index
+        );
+      })
+      .map(({ row }) => row);
+  }, [records, search, date, kelas, status, sortOrder]);
 
   const exportCsv = () => {
     const csv = [
@@ -229,17 +255,20 @@ export default function App() {
     setDate("");
     setKelas("");
     setStatus("");
+    setSortOrder("oldest");
   };
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="#dashboard" aria-label="Attendly dashboard">
+        <a className="brand" href="#dashboard" aria-label="Dashboard Monitoring Absensi">
           <span className="brand-mark">
             <Icon name="scan" size={19} />
           </span>
           <span className="brand-name">
-            attend<span>ly</span>
+            Dashboard
+            <br />
+            <span>Monitoring Absensi</span>
           </span>
         </a>
         <div className="side-label">MENU UTAMA</div>
@@ -288,7 +317,7 @@ export default function App() {
           <section className="page-heading">
             <div>
               <div className="eyebrow">RINGKASAN KEHADIRAN</div>
-              <h1>Dashboard Absensi</h1>
+              <h1>Dashboard Monitoring Absensi</h1>
               <p>Pantau kehadiran siswa secara real-time.</p>
             </div>
             <div className="heading-actions">
@@ -423,7 +452,19 @@ export default function App() {
                 </select>
                 <Icon name="chevron" size={15} />
               </label>
-              {(search || date || kelas || status) && (
+              <label className="filter-control sort-control">
+                <span>Urutkan</span>
+                <select
+                  value={sortOrder}
+                  onChange={(event) => setSortOrder(event.target.value)}
+                  aria-label="Urutkan data absensi"
+                >
+                  <option value="oldest">Terlama ke terbaru</option>
+                  <option value="newest">Terbaru ke terlama</option>
+                </select>
+                <Icon name="chevron" size={15} />
+              </label>
+              {(search || date || kelas || status || sortOrder !== "oldest") && (
                 <button className="clear-button" onClick={clearFilters}>
                   Reset
                 </button>
@@ -518,7 +559,7 @@ export default function App() {
             </footer>
           </section>
           <footer className="page-footer">
-            © {new Date().getFullYear()} Attendly <span>•</span> Sistem
+            © {new Date().getFullYear()} Dashboard Monitoring Absensi <span>•</span> Sistem
             Monitoring Absensi Siswa
           </footer>
         </div>

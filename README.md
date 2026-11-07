@@ -1,4 +1,4 @@
-# Attendly — Dashboard Absensi
+# Dashboard Monitoring Absensi
 Sistem absensi berbasis Internet of Things (IoT) menggunakan ESP32 dan RFID RC522. Sistem membaca kartu RFID, memvalidasi UID kartu, menampilkan informasi mahasiswa melalui OLED, serta mengirimkan data kehadiran ke Google Sheets melalui Google Apps Script melalui protocol httpclient menggunakan wifi. Dilengkapi dashboard berbasis website. sistem ini masih jalan di local
 
 ## Komponen yang Digunakan

@@ -62,9 +62,10 @@ button:disabled {
 }
 .brand-name {
   font:
-    800 21px "Plus Jakarta Sans",
+    800 13px "Plus Jakarta Sans",
     sans-serif;
-  letter-spacing: -1px;
+  line-height: 1.35;
+  letter-spacing: -0.2px;
 }
 .brand-name span {
   color: #4f72e8;
@@ -417,6 +418,9 @@ button:disabled {
 }
 .filter-control select {
   padding-right: 15px;
+}
+.sort-control select {
+  max-width: 155px;
 }
 .filter-control input {
   width: 105px;
